@@ -36,6 +36,12 @@ struct Add {
 struct Serve {
     #[clap(short, long, default_value = "3000")]
     port: u16,
+
+    #[clap(short, long, default_value = "127.0.0.1")]
+    addr: String,
+
+    #[clap(short, long, default_value = "30")]
+    workers: u16,
 }
 
 #[derive(Clap)]
@@ -73,8 +79,9 @@ async fn main() -> Result<()> {
         },
         SubCommand::Serve(args) => {
             let config = Config::build(Environment::Staging)
-                .address("127.0.0.1")
+                .address(args.addr)
                 .port(args.port)
+                .workers(args.workers)
                 .unwrap();
 
             let server = rocket::custom(config);
