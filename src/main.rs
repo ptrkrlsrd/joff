@@ -49,6 +49,7 @@ struct List { }
 type Error = Box<dyn std::error::Error>;
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+const DEFAULT_BUCKET_NAME: &str = "json_data";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -56,8 +57,7 @@ async fn main() -> Result<()> {
     let config_path: String = opts.data_path;
 
     let store = store::new_store(config_path);
-    let bucket_name = "acache";
-    let bucket = store::new_bucket(&store, &bucket_name);
+    let bucket = store::new_bucket(&store, DEFAULT_BUCKET_NAME);
 
 
     match opts.subcmd {
