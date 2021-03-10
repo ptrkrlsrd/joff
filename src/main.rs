@@ -1,9 +1,8 @@
 #![feature(decl_macro)]
 
 use clap::Clap;
-use rocket::{Route};
-use rocket::http::Method;
 use rocket::config::{Config, Environment};
+use rocket::{Route, http::Method};
 
 mod store;
 mod url;
@@ -45,11 +44,11 @@ struct Serve {
 }
 
 #[derive(Clap)]
-struct List {
-}
+struct List { }
 
 type Error = Box<dyn std::error::Error>;
 type Result<T, E = Error> = std::result::Result<T, E>;
+
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -59,6 +58,7 @@ async fn main() -> Result<()> {
     let store = store::new_store(config_path);
     let bucket_name = "acache";
     let bucket = store::new_bucket(&store, &bucket_name);
+
 
     match opts.subcmd {
         SubCommand::Add(args) => {
@@ -89,10 +89,10 @@ async fn main() -> Result<()> {
 
             for item in bucket.iter() {
                 let key: String = item?.key()?;
-                let _data: String = bucket.get(&key)?.unwrap();
+                let data: String = bucket.get(&key)?.unwrap();
 
                 let decoded = url::decode(&key);
-                let route = Route::new(Method::Get, &decoded, http::handler);
+                let route = Route::new(Method::Get, &decoded, http::JSONHandler(data));
 
                 routes.push(route);
             }
