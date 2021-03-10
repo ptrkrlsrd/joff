@@ -13,6 +13,9 @@ mod http;
 struct Opts {
     #[clap(short, long, default_value = "./data")]
     data_path: String,
+
+    #[clap(short, long, default_value = "json_data")]
+    bucket_name: String,
     
     #[clap(subcommand)]
     subcmd: SubCommand,
@@ -49,15 +52,14 @@ struct List { }
 type Error = Box<dyn std::error::Error>;
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-const DEFAULT_BUCKET_NAME: &str = "json_data";
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
     let config_path: String = opts.data_path;
+    let bucket_name: String = opts.bucket_name;
 
     let store = store::new_store(config_path);
-    let bucket = store::new_bucket(&store, DEFAULT_BUCKET_NAME);
+    let bucket = store::new_bucket(&store, &bucket_name);
 
 
     match opts.subcmd {
