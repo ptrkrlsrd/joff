@@ -17,10 +17,12 @@ pub async fn get_json(url: &String) -> Result<serde_json::Value> {
 }
 
 #[derive(Clone)]
-pub struct JSONHandler(pub String);
+pub struct JSONHandler{ 
+    pub data: String 
+}
 
 impl Handler for JSONHandler {
     fn handle<'r>(&self, req: &'r Request, _data: Data) -> Outcome<'r> {
-        return Outcome::from(req, self.0.to_string());
+        return Outcome::from(req, self.data.clone());
     }
 }

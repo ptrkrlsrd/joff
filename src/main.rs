@@ -94,7 +94,7 @@ async fn main() -> Result<()> {
                 let data: String = bucket.get(&key)?.unwrap();
 
                 let decoded = url::decode(&key);
-                let route = Route::new(Method::Get, &decoded, http::JSONHandler(data));
+                let route = Route::new(Method::Get, &decoded, http::JSONHandler{ data });
 
                 routes.push(route);
             }
