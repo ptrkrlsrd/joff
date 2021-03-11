@@ -11,10 +11,10 @@ mod http;
 #[derive(Clap)]
 #[clap(version = "1.0")]
 struct Opts {
-    #[clap(short, long, default_value = "./data")]
+    #[clap(short, long, about = "Path to the KV store", default_value = "./data")]
     data_path: String,
 
-    #[clap(short, long, default_value = "json_data")]
+    #[clap(short, long, about = "Name of the KV bucket", default_value = "json_data")]
     bucket_name: String,
     
     #[clap(subcommand)]
@@ -30,16 +30,18 @@ enum SubCommand {
 
 #[derive(Clap)]
 struct Add {
-    source_url: String,
-    alias_url: String,
+    #[clap(short, long, about = "URL to fetch data from. E.g https://pokeapi.co/api/v2/pokemon/ditto")]
+    url: String,
+    #[clap(short, long, about = "Endpoint to map the stored data to. E.g /api/ditto")]
+    local_endpoint: String,
 }
 
 #[derive(Clap)]
 struct Serve {
-    #[clap(short, long, default_value = "3000")]
+    #[clap(short, long, about = "Port to serve the Mock API on", default_value = "3000")]
     port: u16,
 
-    #[clap(short, long, default_value = "127.0.0.1")]
+    #[clap(short, long, about = "Address for the Mock API", default_value = "127.0.0.1")]
     addr: String,
 
     #[clap(short, long, default_value = "30")]
@@ -64,9 +66,9 @@ async fn main() -> Result<()> {
 
     match opts.subcmd {
         SubCommand::Add(args) => {
-            let url = args.source_url;
-            let alias_url = args.alias_url;
-            let encoded_url = url::encode(&alias_url);
+            let url = args.url;
+            let local_endpoint = args.local_endpoint;
+            let encoded_url = url::encode(&local_endpoint);
             let reponse = http::get_json(&url).await?;
             let response_string = reponse.to_string();
 
