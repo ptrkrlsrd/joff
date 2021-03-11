@@ -20,5 +20,9 @@ jobs:
       run: rustup override set nightly
     - name: Build
       run: cargo build --verbose
-    #- name: Run tests
-    #  run: cargo test --verbose
+    - name: Rust Release binary
+      uses: Douile/rust-build.action@v0.1.26
+      with:
+        RUSTTARGET: ${{ matrix.target }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        EXTRA_FILES: "README.md LICENSE"
