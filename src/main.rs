@@ -1,5 +1,6 @@
 #![feature(decl_macro)]
 
+use std::fs;
 use clap::Clap;
 use rocket::config::{Config, Environment};
 use rocket::{Route, http::Method};
@@ -29,11 +30,29 @@ enum SubCommand {
 }
 
 #[derive(Clap)]
+enum AddSubCommand {
+    FromURL(AddFromURL),
+    FromFile(AddFromFile),
+}
+
+#[derive(Clap)]
 struct Add {
-    #[clap(short, long, about = "URL to fetch data from. E.g https://pokeapi.co/api/v2/pokemon/ditto")]
-    url: String,
-    #[clap(short, long, about = "Endpoint to map the stored data to. E.g /api/ditto")]
+    #[clap(subcommand)]
+    subcmd: AddSubCommand,
+    #[clap(about = "Endpoint to map the stored data to. E.g /api/ditto")]
     local_endpoint: String,
+}
+
+#[derive(Clap)]
+struct AddFromURL {
+    #[clap(about = "URL to fetch data from. E.g https://pokeapi.co/api/v2/pokemon/ditto")]
+    url: String,
+}
+
+#[derive(Clap)]
+struct AddFromFile {
+    #[clap(about = "File path")]
+    path: String,
 }
 
 #[derive(Clap)]
@@ -63,24 +82,32 @@ async fn main() -> Result<()> {
     let store = store::new_store(config_path)?;
     let bucket = store::new_bucket(&store, &bucket_name)?;
 
-
     match opts.subcmd {
-        SubCommand::Add(args) => {
-            let url = args.url;
-            let local_endpoint = args.local_endpoint;
-            let encoded_url = url::encode(&local_endpoint);
-            let reponse = http::get_json(&url).await?;
-            let response_string = reponse.to_string();
+        SubCommand::Add(add_args) => {
+            let content: String;
+            let encoded_url: String;
+            let local_endpoint = add_args.local_endpoint;
 
-            store::set_value_for_key(&bucket, encoded_url, response_string)?;
+            match add_args.subcmd {
+                AddSubCommand::FromURL(url_args) => {
+                    let url = url_args.url;
+                    encoded_url = url::encode(&local_endpoint);
+
+                    let reponse = http::get_json(&url).await?;
+                    content = reponse.to_string();
+                },
+                AddSubCommand::FromFile(path_args) => {
+                    encoded_url = url::encode(&local_endpoint);
+                    content = fs::read_to_string(path_args.path)
+                        .expect("Could not read the file");
+                }
+            }
+
+            store::set_value_for_key(&bucket, encoded_url, content)?;
         },
         SubCommand::List(_) => {
-            for item in bucket.iter() {
-                let key: String = item?.key()?;
-                let decoded = url::decode(&key)?;
-
-                println!("URL: {}", &decoded);
-            }
+            // TODO: #3 Implement Trait
+            store::list_items(&bucket);
         },
         SubCommand::Serve(args) => {
             let rocket_cfg = Config::build(Environment::Staging)
@@ -106,9 +133,7 @@ async fn main() -> Result<()> {
                 routes.push(route);
             }
 
-            server
-                .mount("/", routes)
-                .launch();
+            server.mount("/", routes).launch();
         }
     }
 

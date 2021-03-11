@@ -1,3 +1,5 @@
+use crate::url::decode;
+
 use kv::*;
 use std::result::Result;
 
@@ -13,4 +15,13 @@ pub fn new_bucket<'a>(store: &Store, bucket_name: &str) -> Result<kv::Bucket<'a,
 
 pub fn set_value_for_key(bucket: &Bucket<String, String>, key: String, value: String) -> Result<(), kv::Error> {
     return bucket.set(key, value);
+}
+
+pub fn list_items(bucket: &Bucket<String, String>) {
+    for item in bucket.iter() {
+        let key: String = item.unwrap().key().unwrap();
+        let decoded = decode(&key).unwrap();
+
+        println!("URL: {}", &decoded);
+    }
 }
