@@ -2,6 +2,9 @@
 name = "joff"
 version = "0.1.0"
 edition = "2018"
+description = "Store JSON API responses in a key-value store and serve them locally."
+license = "Apache-2.0"
+authors = ["ptrkrlsrd"]
 
 [profile.release]
 debug = 1
