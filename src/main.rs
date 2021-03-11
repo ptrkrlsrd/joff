@@ -58,8 +58,8 @@ async fn main() -> Result<()> {
     let config_path: String = opts.data_path;
     let bucket_name: String = opts.bucket_name;
 
-    let store = store::new_store(config_path);
-    let bucket = store::new_bucket(&store, &bucket_name);
+    let store = store::new_store(config_path)?;
+    let bucket = store::new_bucket(&store, &bucket_name)?;
 
 
     match opts.subcmd {
@@ -68,32 +68,37 @@ async fn main() -> Result<()> {
             let alias_url = args.alias_url;
             let encoded_url = url::encode(&alias_url);
             let reponse = http::get_json(&url).await?;
+            let response_string = reponse.to_string();
 
-            store::set_value_for_key(&bucket, encoded_url, reponse.to_string());
+            store::set_value_for_key(&bucket, encoded_url, response_string)?;
         },
         SubCommand::List(_) => {
             for item in bucket.iter() {
                 let key: String = item?.key()?;
-                let decoded = url::decode(&key);
+                let decoded = url::decode(&key)?;
 
                 println!("URL: {}", &decoded);
             }
         },
         SubCommand::Serve(args) => {
-            let config = Config::build(Environment::Staging)
+            let rocket_cfg = Config::build(Environment::Staging)
                 .address(args.addr)
                 .port(args.port)
                 .workers(args.workers)
                 .unwrap();
 
-            let server = rocket::custom(config);
+            let server = rocket::custom(rocket_cfg);
             let mut routes: Vec<Route> = Vec::new();
 
             for item in bucket.iter() {
                 let key: String = item?.key()?;
-                let data: String = bucket.get(&key)?.unwrap();
+                let bucket_data = bucket.get(&key)?;
+                let data: String = match bucket_data {
+                    None => panic!("Failed getting data from bucket"),
+                    Some(data) => data,
+                };
 
-                let decoded = url::decode(&key);
+                let decoded = url::decode(&key)?;
                 let route = Route::new(Method::Get, &decoded, http::JSONHandler{ data });
 
                 routes.push(route);
