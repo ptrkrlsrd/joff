@@ -29,14 +29,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: nightly
-
+    
     - name: Build
-      run: cargo build --release --locked
+      run: |
+        rustup override set nightly
+        cargo build --release --locked
 
     - name: Upload binaries to release
       uses: actions/upload-artifact@v2
