@@ -5,7 +5,9 @@
 Since this project is using Rocket.rs, you'll have to use the nightly toolchain by running: `rustup override set nightly`.
 
 ## Installation
-* Run `cargo install joff`
+* Run:
+    * `rustup default nightly`
+    * `cargo install joff`
 
 ## Usage
 ```
