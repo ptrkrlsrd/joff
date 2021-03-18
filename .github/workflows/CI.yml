@@ -1,42 +1,54 @@
-name: CI
+name: Build
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  release:
-    types: [ created ]
-
-env:
-  CARGO_TERM_COLOR: always
+    paths-ignore:
+      - "**.md"
+      
 jobs:
-  publish:
-    name: Publish for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  build:
     strategy:
+      fail-fast: false
       matrix:
-        name: [ linux, macos]
+        channel:
+          - nightly
+        target-triple:
+          - x86_64-unknown-linux-gnu
         include:
-          - name: linux
-            os: ubuntu-latest
-            artifact_name: target/release/joff
-            asset_name: joff-linux
-          - name: macos
-            os: macos-latest
-            artifact_name: target/release/joff
-            asset_name: joff-macos
-
+          - target-triple: x86_64-unknown-linux-gnu
+            host-triple: x86_64-unknown-linux-gnu
+            channel: nightly
+            os: ubuntu-18.04
+            
+    name: Building ${{ matrix.channel }}-${{ matrix.target-triple }}
+    runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v1
-    - name: Build
-      run: |
-        rustup override set nightly
-        cargo build --release --locked
+      - name: Checkout
+        uses: actions/checkout@v2
 
-    - name: Upload binaries to release
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ matrix.asset_name }}
-        path: ${{ matrix.artifact_name }}
-    
+      - uses: Swatinem/rust-cache@v1
+
+      - name: 'Install ${{ matrix.channel }}-${{ matrix.host-triple }} for target: ${{ matrix.target-triple }}'
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          target: ${{ matrix.target-triple }}
+
+      - name: '`cargo test --release --target ${{ matrix.target-triple }}`'
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --release --target ${{ matrix.target-triple }}
+
+      - name: '`cargo build --release --target ${{ matrix.target-triple }}`'
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target ${{ matrix.target-triple }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: bitwarden_rs-${{ matrix.target-triple }}${{ matrix.ext }}
+          path: target/${{ matrix.target-triple }}/release/bitwarden_rs${{ matrix.ext }}
+
