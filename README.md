@@ -1,5 +1,5 @@
 # Joff
-[![Rust](https://github.com/ptrkrlsrd/joff/actions/workflows/rust.yml/badge.svg)](https://github.com/ptrkrlsrd/joff/actions/workflows/rust.yml)
+[![Rust](https://github.com/ptrkrlsrd/joff/actions/workflows/CI.yml/badge.svg)](https://github.com/ptrkrlsrd/joff/actions/workflows/CI.yml)
 ## Store JSON responses locally and serve them locally using Rocket
 
 Since this project is using Rocket.rs, you'll have to use the nightly toolchain by running: `rustup override set nightly`.

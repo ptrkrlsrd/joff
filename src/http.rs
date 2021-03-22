@@ -3,7 +3,6 @@ use rocket::Response;
 use url::Url;
 use rocket::{Request, Data};
 use rocket::handler::{Handler, Outcome};
-use rocket::response::content;
 use rocket::http::ContentType;
 
 type Error = Box<dyn std::error::Error>;
