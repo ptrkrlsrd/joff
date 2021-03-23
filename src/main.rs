@@ -1,5 +1,6 @@
 #![feature(decl_macro)]
 
+use crate::http::StorableResponse;
 use std::fs;
 use clap::Clap;
 use rocket::config::{Config, Environment};
@@ -122,13 +123,10 @@ async fn main() -> Result<()> {
             for item in bucket.iter() {
                 let key: String = item?.key()?;
                 let bucket_data = bucket.get(&key)?;
-                let data: String = match bucket_data {
-                    None => panic!("Failed getting data from bucket"),
-                    Some(data) => data,
-                };
 
+                let v: StorableResponse = serde_json::from_str(&bucket_data.unwrap())?;
                 let decoded = url::decode(&key)?;
-                let route = Route::new(Method::Get, &decoded, http::JSONHandler{ data });
+                let route = Route::new(Method::Get, &decoded, http::JSONHandler{ body: v.body, headers: v.headers });
 
                 routes.push(route);
             }
