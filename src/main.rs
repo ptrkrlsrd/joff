@@ -107,7 +107,6 @@ async fn main() -> Result<()> {
             store::set_value_for_key(&bucket, encoded_url, content)?;
         },
         SubCommand::List(_) => {
-            // TODO: #3 Implement Trait
             store::list_items(&bucket);
         },
         SubCommand::Serve(args) => {
@@ -126,7 +125,7 @@ async fn main() -> Result<()> {
 
                 let v: StorableResponse = serde_json::from_str(&bucket_data.unwrap())?;
                 let decoded = url::decode(&key)?;
-                let route = Route::new(Method::Get, &decoded, http::JSONHandler{ body: v.body, headers: v.headers });
+                let route = Route::new(Method::Get, &decoded, http::StorableResponse{ body: v.body, headers: v.headers });
 
                 routes.push(route);
             }
