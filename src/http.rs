@@ -1,6 +1,10 @@
+use std::io::Cursor;
+use rocket::Response;
 use url::Url;
 use rocket::{Request, Data};
 use rocket::handler::{Handler, Outcome};
+use rocket::response::content;
+use rocket::http::ContentType;
 
 type Error = Box<dyn std::error::Error>;
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -23,6 +27,9 @@ pub struct JSONHandler{
 
 impl Handler for JSONHandler {
     fn handle<'r>(&self, req: &'r Request, _data: Data) -> Outcome<'r> {
-        return Outcome::from(req, self.data.clone());
+        let mut response = Response::new();
+        response.set_header(ContentType::JSON);
+        response.set_sized_body(Cursor::new(self.data.clone()));
+        return Outcome::from(req, response);
     }
 }
