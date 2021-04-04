@@ -37,9 +37,12 @@ pub async fn get_json(url: &String) -> Result<serde_json::Value> {
 impl Handler for StorableResponse {
     fn handle<'r>(&self, req: &'r Request, _data: Data) -> Outcome<'r> {
         let mut response = Response::new();
+        let disallowed_headers = vec!("transfer-encoding");
 
         for (key, value) in self.headers.iter() {
-            response.adjoin_raw_header(key.clone(), value.clone());
+            if !disallowed_headers.contains(&key.as_str()) {
+                response.set_raw_header(key.clone(), value.clone());
+            }
         }
 
         response.set_sized_body(Cursor::new(self.body.clone()));
