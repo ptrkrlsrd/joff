@@ -17,6 +17,22 @@ pub struct StorableResponse {
     pub headers: HashMap<String, String>,
 }
 
+impl Handler for StorableResponse {
+    fn handle<'r>(&self, req: &'r Request, _data: Data) -> Outcome<'r> {
+        let mut response = Response::new();
+        let disallowed_headers = vec!("transfer-encoding");
+
+        for (key, value) in self.headers.iter() {
+            if !disallowed_headers.contains(&key.as_str()) {
+                response.set_raw_header(key.clone(), value.clone());
+            }
+        }
+
+        response.set_sized_body(Cursor::new(self.body.clone()));
+        return Outcome::from(req, response);
+    }
+}
+
 pub async fn get_json(url: &String) -> Result<serde_json::Value> {
     let url = Url::parse(&url)?;
     let resp = reqwest::get(url).await?;
@@ -32,20 +48,4 @@ pub async fn get_json(url: &String) -> Result<serde_json::Value> {
     let storable_response = StorableResponse { body, headers };
 
     return Ok(json!(storable_response));
-}
-
-impl Handler for StorableResponse {
-    fn handle<'r>(&self, req: &'r Request, _data: Data) -> Outcome<'r> {
-        let mut response = Response::new();
-        let disallowed_headers = vec!("transfer-encoding");
-
-        for (key, value) in self.headers.iter() {
-            if !disallowed_headers.contains(&key.as_str()) {
-                response.set_raw_header(key.clone(), value.clone());
-            }
-        }
-
-        response.set_sized_body(Cursor::new(self.body.clone()));
-        return Outcome::from(req, response);
-    }
 }

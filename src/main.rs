@@ -123,9 +123,9 @@ async fn main() -> Result<()> {
                 let key: String = item?.key()?;
                 let bucket_data = bucket.get(&key)?;
 
-                let v: StorableResponse = serde_json::from_str(&bucket_data.unwrap())?;
+                let response: StorableResponse = serde_json::from_str(&bucket_data.unwrap())?;
                 let decoded = url::decode(&key)?;
-                let route = Route::new(Method::Get, &decoded, http::StorableResponse{ body: v.body, headers: v.headers });
+                let route = Route::new(Method::Get, &decoded, response);
 
                 routes.push(route);
             }
