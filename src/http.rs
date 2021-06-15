@@ -34,8 +34,15 @@ impl Handler for StorableResponse {
 }
 
 pub async fn get_json(url: &String) -> Result<serde_json::Value> {
-    let url = Url::parse(&url)?;
-    let resp = reqwest::get(url).await?;
+    let url = match Url::parse(&url) {
+        Ok(url) => url,
+        Err(error) => panic!("Failed parsing URL: {:?}", error),
+    };
+
+    let resp = match reqwest::get(url).await {
+        Ok(resp) => resp,
+        Err(error) => panic!("Failed getting response: {:?}", error),
+    };
 
     let mut headers: HashMap<String, String> = HashMap::new();
     for (key, value) in resp.headers().iter() {
@@ -43,7 +50,11 @@ pub async fn get_json(url: &String) -> Result<serde_json::Value> {
         headers.insert(key.to_string(), header_value.to_string());
     }
 
-    let data = resp.json::<serde_json::Value>().await?;
+    let data = match resp.json::<serde_json::Value>().await {
+        Ok(json_data) => json_data,
+        Err(error) => panic!("Failed deserializing JSON: {:?}", error),
+    };
+
     let body = data.to_string();
     let storable_response = StorableResponse { body, headers };
 

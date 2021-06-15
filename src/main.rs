@@ -80,8 +80,15 @@ async fn main() -> Result<()> {
     let config_path: String = opts.data_path;
     let bucket_name: String = opts.bucket_name;
 
-    let store = store::new_store(config_path)?;
-    let bucket = store::new_bucket(&store, &bucket_name)?;
+    let store = match store::new_store(config_path) {
+        Ok(store) => store,
+        Err(error) => panic!("Failed creating store: {:?}", error),
+    };
+
+    let bucket = match store::new_bucket(&store, &bucket_name) {
+        Ok(bucket) => bucket,
+        Err(error) => panic!("Failed creating bucket: {:?}", error),
+    };
 
     match opts.subcmd {
         SubCommand::Add(add_args) => {
@@ -94,13 +101,12 @@ async fn main() -> Result<()> {
                     let url = url_args.url;
                     encoded_url = url::encode(&local_endpoint);
 
-                    let reponse = http::get_json(&url).await?;
+                    let reponse = http::get_json(&url).await.expect("Failed performing request");
                     content = reponse.to_string();
                 },
                 AddSubCommand::FromFile(path_args) => {
                     encoded_url = url::encode(&local_endpoint);
-                    content = fs::read_to_string(path_args.path)
-                        .expect("Could not read the file");
+                    content = fs::read_to_string(path_args.path).expect("Could not read the file");
                 }
             }
 
@@ -120,11 +126,26 @@ async fn main() -> Result<()> {
             let mut routes: Vec<Route> = Vec::new();
 
             for item in bucket.iter() {
-                let key: String = item?.key()?;
-                let bucket_data = bucket.get(&key)?;
+                let key: String = match item?.key() {
+                    Ok(key) => key,
+                    Err(error) => panic!("Failed getting key: {:?}", error),
+                };
 
-                let response: StorableResponse = serde_json::from_str(&bucket_data.unwrap())?;
-                let decoded = url::decode(&key)?;
+                let bucket_data = match bucket.get(&key) {
+                    Ok(data) => data,
+                    Err(error) => panic!("Failed loading data: {:?}", error),
+                };
+
+                let response: StorableResponse = match serde_json::from_str(&bucket_data.unwrap()) {
+                    Ok(json_data) => json_data,
+                    Err(error) => panic!("Failed deserializing JSON: {:?}", error),
+                };
+
+                let decoded = match url::decode(&key) {
+                    Ok(json_data) => json_data,
+                    Err(error) => panic!("Failed decoding URL: {:?}", error),
+                };
+
                 let route = Route::new(Method::Get, &decoded, response);
 
                 routes.push(route);
