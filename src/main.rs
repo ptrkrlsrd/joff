@@ -1,8 +1,6 @@
-#![feature(decl_macro)]
-
 use crate::http::StorableResponse;
 use std::fs;
-use clap::Clap;
+use clap::{Parser};
 use rocket::config::{Config, Environment};
 use rocket::{Route, http::Method};
 
@@ -10,65 +8,65 @@ mod store;
 mod url;
 mod http;
 
-#[derive(Clap)]
-#[clap(version = "1.0")]
+#[derive(Parser)]
+#[command(version = "1.0")]
 struct Opts {
-    #[clap(short, long, about = "Path to the KV store", default_value = "./data")]
+    #[arg(short, long, default_value = "./data")]
     data_path: String,
 
-    #[clap(short, long, about = "Name of the KV bucket", default_value = "json_data")]
+    #[arg(short, long, default_value = "json_data")]
     bucket_name: String,
     
-    #[clap(subcommand)]
+    #[command(subcommand)]
     subcmd: SubCommand,
 }
 
-#[derive(Clap)]
+#[derive(Parser)]
 enum SubCommand {
     Add(Add),
     Serve(Serve),
     List(List),
 }
 
-#[derive(Clap)]
+#[derive(Parser)]
 enum AddSubCommand {
     FromURL(AddFromURL),
     FromFile(AddFromFile),
 }
 
-#[derive(Clap)]
+#[derive(Parser)]
 struct Add {
-    #[clap(subcommand)]
+    #[command(subcommand)]
     subcmd: AddSubCommand,
-    #[clap(about = "Endpoint to map the stored data to. E.g /api/ditto")]
+    #[arg()]
     local_endpoint: String,
 }
 
-#[derive(Clap)]
+#[derive(Parser)]
 struct AddFromURL {
-    #[clap(about = "URL to fetch data from. E.g https://pokeapi.co/api/v2/pokemon/ditto")]
+    #[arg(short, long)]
     url: String,
 }
 
-#[derive(Clap)]
+#[derive(Parser)]
 struct AddFromFile {
-    #[clap(about = "File path")]
+    #[arg()]
     path: String,
 }
 
-#[derive(Clap)]
+#[derive(Parser)]
 struct Serve {
-    #[clap(short, long, about = "Port to serve the Mock API on", default_value = "3000")]
+    #[arg(short, long, default_value = "3000")]
     port: u16,
 
-    #[clap(short, long, about = "Address for the Mock API", default_value = "127.0.0.1")]
+    #[arg(short, long, default_value = "127.0.0.1")]
     addr: String,
 
-    #[clap(short, long, default_value = "30")]
+    #[arg(short, long, default_value = "30")]
     workers: u16,
 }
 
-#[derive(Clap)]
+#[derive(Parser)]
 struct List { }
 
 type Error = Box<dyn std::error::Error>;
@@ -126,26 +124,14 @@ async fn main() -> Result<()> {
             let mut routes: Vec<Route> = Vec::new();
 
             for item in bucket.iter() {
-                let key: String = match item?.key() {
-                    Ok(key) => key,
-                    Err(error) => panic!("Failed getting key: {:?}", error),
-                };
+                let key: String = item?.key().expect("Failed getting key");
 
-                let bucket_data = match bucket.get(&key) {
-                    Ok(data) => data,
-                    Err(error) => panic!("Failed loading data: {:?}", error),
-                };
+                let bucket_data = bucket.get(&key).expect("Failed loading data");
 
-                let response: StorableResponse = match serde_json::from_str(&bucket_data.unwrap()) {
-                    Ok(json_data) => json_data,
-                    Err(error) => panic!("Failed deserializing JSON: {:?}", error),
-                };
+                let response: StorableResponse = serde_json::from_str(&bucket_data.unwrap())
+                    .expect("Failed deserializing JSON");
 
-                let decoded = match url::decode(&key) {
-                    Ok(json_data) => json_data,
-                    Err(error) => panic!("Failed decoding URL: {:?}", error),
-                };
-
+                let decoded = url::decode(&key).expect("Failed decoding URL");
                 let route = Route::new(Method::Get, &decoded, response);
 
                 routes.push(route);
