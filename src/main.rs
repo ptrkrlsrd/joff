@@ -1,4 +1,5 @@
 use crate::http::StorableResponse;
+use std::f32::consts::E;
 use std::fs;
 use clap::{Parser};
 use rocket::config::{Config, Environment};
@@ -99,12 +100,19 @@ async fn main() -> Result<()> {
                     let url = url_args.url;
                     encoded_url = url::encode(&local_endpoint);
 
-                    let reponse = http::get_json(&url).await.expect("Failed performing request");
+                    let reponse = http::get_json(&url).await;
+                    let resposnse = match reponse {
+                        Ok(response) => response,
+                        Err(error) => panic!("Failed getting JSON from URL: {:?}, error: {:?}", url, error),
+                    };
                     content = reponse.to_string();
                 },
                 AddSubCommand::FromFile(path_args) => {
                     encoded_url = url::encode(&local_endpoint);
-                    content = fs::read_to_string(path_args.path).expect("Could not read the file");
+                    content = match fs::read_to_string(path_args.path) {
+                        Ok(content) => content,
+                        Err(error) => panic!("Failed reading file: {:?}", error),
+                    }
                 }
             }
 
@@ -124,14 +132,46 @@ async fn main() -> Result<()> {
             let mut routes: Vec<Route> = Vec::new();
 
             for item in bucket.iter() {
-                let key: String = item?.key().expect("Failed getting key");
+                let key: String = match item?.key() {
+                    Some(key) => key.to_string(),
+                    None => {
+                        println!("No key found for item: {:?}", item);
+                        continue;
+                    }
+                };
 
-                let bucket_data = bucket.get(&key).expect("Failed loading data");
+                let bucket_data = match bucket.get(&key) {
+                    Ok(data) => data,
+                    Err(error) => {
+                        println!("Failed getting data for key: {:?}, error: {:?}", key, error);
+                        continue;
+                    }
+                };
 
-                let response: StorableResponse = serde_json::from_str(&bucket_data.unwrap())
-                    .expect("Failed deserializing JSON");
+                let bucket_data = match bucket_data {
+                    Some(data) => data,
+                    None => {
+                        println!("No data found for key: {:?}", key);
+                        continue;
+                    }
+                };
 
-                let decoded = url::decode(&key).expect("Failed decoding URL");
+                let response: StorableResponse = match serde_json::from_str(&bucket_data) {
+                    Ok(response) => response,
+                    Err(error) => {
+                        println!("Failed deserializing JSON for key: {:?}, error: {:?}", key, error);
+                        continue;
+                    }
+                };
+
+                let decoded = match url::decode(&key) {
+                    Ok(decoded) => decoded,
+                    Err(error) => {
+                        println!("Failed decoding key to URL: {:?}, error: {:?}", key, error);
+                        continue;
+                    }
+                };
+
                 let route = Route::new(Method::Get, &decoded, response);
 
                 routes.push(route);
