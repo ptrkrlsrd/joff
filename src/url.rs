@@ -1,4 +1,4 @@
-use percent_encoding::{utf8_percent_encode, percent_decode, AsciiSet, CONTROLS};
+use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, CONTROLS};
 
 const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
 

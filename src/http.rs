@@ -1,12 +1,11 @@
+use rocket::handler::{Handler, Outcome};
+use rocket::Response;
+use rocket::{Data, Request};
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::collections::HashMap;
 use std::io::Cursor;
-use rocket::Response;
 use url::Url;
-use rocket::{Request, Data};
-use rocket::handler::{Handler, Outcome};
-use serde_json::json;
-use serde::{Deserialize, Serialize};
-
 
 type Error = Box<dyn std::error::Error>;
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -20,7 +19,7 @@ pub struct StorableResponse {
 impl Handler for StorableResponse {
     fn handle<'r>(&self, req: &'r Request, _data: Data) -> Outcome<'r> {
         let mut response = Response::new();
-        let disallowed_headers = vec!("transfer-encoding");
+        let disallowed_headers = vec!["transfer-encoding"];
 
         for (key, value) in self.headers.iter() {
             if !disallowed_headers.contains(&key.as_str()) {
