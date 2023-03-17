@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - '1.*'
   release:
     types: [ created ]
 
@@ -14,6 +13,7 @@ jobs:
   publish:
     name: Publish for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+   
     strategy:
       matrix:
         name: [ linux, macos]
