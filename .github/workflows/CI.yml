@@ -2,8 +2,7 @@ name: CI
 
 on:
   push:
-    tags:
-      - '1.*'
+    branches: [ main ]
   release:
     types: [ created ]
 
