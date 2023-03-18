@@ -1,6 +1,7 @@
 use crate::http::StorableResponse;
 use std::fs;
 use clap::Parser;
+use reqwest::Url;
 use rocket::config::{Config, Environment};
 use rocket::{Route, http::Method};
 use kv::Bucket;
@@ -111,9 +112,9 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn add_from_file(bucket: Bucket<'_, String, String>,local_endpoint: String, path_args: String) {
+async fn add_from_file(bucket: Bucket<'_, String, String>,local_endpoint: String, source_path: String) {
     let encoded_url = url::encode(&local_endpoint);
-    let content = match fs::read_to_string(path_args) {
+    let content = match fs::read_to_string(source_path) {
         Ok(content) => content,
         Err(error) => panic!("Failed reading file: {:?}", error),
     };
@@ -121,15 +122,19 @@ async fn add_from_file(bucket: Bucket<'_, String, String>,local_endpoint: String
     let _ = store::set_value_for_key(&bucket, encoded_url, content);
 }
 
-async fn add_from_url(bucket: Bucket<'_, String, String>, local_endpoint: String, url: String) {
-    let encoded_url = url::encode(&local_endpoint);
-
-    let response = http::get_json(&url).await;
-    let response = match response {
-        Ok(response) => response,
-        Err(error) => panic!("Failed getting JSON from URL: {:?}, error: {:?}", url, error),
+async fn add_from_url(bucket: Bucket<'_, String, String>, local_endpoint: String, source_url: String) {
+    let url = match Url::parse(&source_url) {
+        Ok(url) => url,
+        Err(error) => panic!("Failed parsing URL: {:?}", error),
     };
 
+    let response = http::get_json(url).await;
+    let response = match response {
+        Ok(response) => response,
+        Err(error) => panic!("Failed getting JSON from error: {:?}", error),
+    };
+
+    let encoded_url = url::encode(&local_endpoint);
     let _ = store::set_value_for_key(&bucket, encoded_url, response.to_string());
 }
 
@@ -141,40 +146,37 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
         .unwrap();
 
     let server = rocket::custom(rocket_cfg);
-    let mut routes: Vec<Route> = Vec::new();
-
-    bucket.iter().for_each(|item| {
+    let routes: Vec<Route> = bucket.iter().filter_map(|item| {
         let key: String = item.unwrap().key().unwrap();
-
+    
         let bucket_data = match bucket.get(&key) {
             Ok(data) => data,
             Err(error) => {
                 println!("Failed getting data for key: {:?}, error: {:?}", key, error);
-                return;
+                return None;
             }
         };
-
-
+    
         let json_response: StorableResponse = match serde_json::from_str(&bucket_data.unwrap()) {
             Ok(json_data) => json_data,
             Err(error) => {
                 println!("Failed deserializing JSON for key: {:?}, error: {:?}", key, error);
-                return;
+                return None;
             }
         };
-
+    
         let decoded_url = match url::decode(&key) {
             Ok(url) => url,
             Err(error) => {
                 println!("Failed decoding key to URL: {:?}, error: {:?}", key, error);
-                return;
+                return None;
             }
         };
-
+    
         let route = Route::new(Method::Get, &decoded_url, json_response);
-
-        routes.push(route);
-    });
+    
+        Some(route)
+    }).collect();
 
     server.mount("/", routes).launch();
 

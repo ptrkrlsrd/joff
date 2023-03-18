@@ -1,8 +1,8 @@
+use reqwest::header::HeaderMap;
 use rocket::handler::{Handler, Outcome};
 use rocket::Response;
 use rocket::{Data, Request};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::collections::HashMap;
 use std::io::Cursor;
 use url::Url;
@@ -14,6 +14,12 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 pub struct StorableResponse {
     pub body: String,
     pub headers: HashMap<String, String>,
+}
+
+impl StorableResponse {
+    fn from(body: String, headers: HashMap<String, String>) -> StorableResponse {
+        return StorableResponse { body, headers }
+    }
 }
 
 impl Handler for StorableResponse {
@@ -32,30 +38,24 @@ impl Handler for StorableResponse {
     }
 }
 
-pub async fn get_json(url: &String) -> Result<serde_json::Value> {
-    let url = match Url::parse(&url) {
-        Ok(url) => url,
-        Err(error) => panic!("Failed parsing URL: {:?}", error),
-    };
-
+pub async fn get_json(url: Url) -> Result<serde_json::Value, Error> {
     let resp = match reqwest::get(url).await {
         Ok(resp) => resp,
-        Err(error) => panic!("Failed getting response: {:?}", error),
+        Err(error) => return Err(error.into()),
     };
 
-    let mut headers: HashMap<String, String> = HashMap::new();
-    for (key, value) in resp.headers().iter() {
-        let header_value = value.to_str()?;
-        headers.insert(key.to_string(), header_value.to_string());
-    }
+    let headers = headers_to_map(resp.headers().clone());
 
-    let data = match resp.json::<serde_json::Value>().await {
-        Ok(json_data) => json_data,
-        Err(error) => panic!("Failed deserializing JSON: {:?}", error),
-    };
+    let json = resp.json::<serde_json::Value>().await?;
 
-    let body = data.to_string();
-    let storable_response = StorableResponse { body, headers };
+    let storable_response = StorableResponse::from(json.to_string(), headers);
 
-    return Ok(json!(storable_response));
+    Ok(serde_json::to_value(storable_response)?)
+}
+
+pub fn headers_to_map(headers: HeaderMap) -> HashMap<String, String> {
+    let headers = headers.iter()
+    .map(|(key, value)| (key.to_string(), value.to_str().map_or(String::new(), str::to_string)))
+    .collect::<HashMap<_, _>>();
+    headers
 }
