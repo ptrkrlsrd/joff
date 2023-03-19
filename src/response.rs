@@ -9,6 +9,7 @@ use url::Url;
 
 type Error = Box<dyn std::error::Error>;
 type Result<T, E = Error> = std::result::Result<T, E>;
+type JsonValue = serde_json::Value;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct StorableResponse {
@@ -38,22 +39,34 @@ impl Handler for StorableResponse {
     }
 }
 
-pub async fn get_json(url: Url) -> Result<serde_json::Value, Error> {
-    let resp = match reqwest::get(url).await {
-        Ok(resp) => resp,
-        Err(error) => return Err(error.into()),
-    };
+pub async fn get_json(url: Url) -> Result<JsonValue, Error> {
+    let response = reqwest::get(url).await?;
+    let json = to_deserialized_response(&response).await?;
 
-    let headers = headers_to_map(resp.headers().clone());
-
-    let json = resp.json::<serde_json::Value>().await?;
-
-    let storable_response = StorableResponse::from(json.to_string(), headers);
-
-    Ok(serde_json::to_value(storable_response)?)
+    Ok(json)
 }
 
-pub fn headers_to_map(headers: HeaderMap) -> HashMap<String, String> {
+async fn to_deserialized_response(resp: &reqwest::Response) -> Result<JsonValue, Error> {
+    let json = read_json(resp.clone()).await?;
+    
+    // Convert the headers to a map and create a storable response
+    let headers_map = headers_to_map(&resp.headers().clone());
+    let mut storable_response = StorableResponse::from(json.to_string(), headers_map);
+
+    // Convert the storable response to a JSON value
+    let storable_response_json = serde_json::to_value(storable_response)?;
+
+    // Return the JSON value
+    Ok(storable_response_json)
+}
+
+async fn read_json(resp: &reqwest::Response) -> Result<serde_json::Value, Error> {
+    let json_data = resp.json::<serde_json::Value>().await?;
+    let json = serde_json::from_str::<serde_json::Value>(&json_data.to_string())?;
+    Ok(json)
+}
+
+fn headers_to_map(headers: &HeaderMap) -> HashMap<String, String> {
     let headers = headers.iter()
     .map(|(key, value)| (key.to_string(), value.to_str().map_or(String::new(), str::to_string)))
     .collect::<HashMap<_, _>>();
