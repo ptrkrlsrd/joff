@@ -7,9 +7,14 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use url::Url;
 
+use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, CONTROLS};
+
 type Error = Box<dyn std::error::Error>;
 type Result<T, E = Error> = std::result::Result<T, E>;
 type JsonValue = serde_json::Value;
+
+const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
+
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct StorableResponse {
@@ -18,8 +23,8 @@ pub struct StorableResponse {
 }
 
 impl StorableResponse {
-    fn from(body: String, headers: HashMap<String, String>) -> StorableResponse {
-        return StorableResponse { body, headers }
+    fn from(body: String, headers: HashMap<String, String>) -> Self {
+        return Self { body, headers }
     }
 }
 
@@ -69,4 +74,21 @@ async fn read_json(resp: reqwest::Response) -> Result<serde_json::Value, Error> 
     let json_data = resp.json::<serde_json::Value>().await?;
     let json = serde_json::from_str::<serde_json::Value>(&json_data.to_string())?;
     Ok(json)
+}
+
+pub fn encode_url(url: &String) -> String {
+    let encoded_url_iter = utf8_percent_encode(&url, FRAGMENT);
+    let encoded_url: String = encoded_url_iter.collect();
+
+    return encoded_url;
+}
+
+pub fn decode_url(url: &str) -> Result<String, std::str::Utf8Error> {
+    let decoded_iter = percent_decode(url.as_bytes());
+    let decoded = decoded_iter.decode_utf8();
+
+    return match decoded {
+        Ok(url) => Ok(url.to_string()),
+        Err(error) => Err(error),
+    };
 }

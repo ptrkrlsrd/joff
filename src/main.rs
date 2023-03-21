@@ -1,10 +1,9 @@
-use crate::response::StorableResponse;
-use std::fs;
 use clap::Parser;
-use reqwest::Url;
-use rocket::config::{Config, Environment};
-use rocket::{Route, http::Method};
 use kv::Bucket;
+use response::decode_url;
+use storage::{new_route_from_file, new_route_from_url};
+use crate::response::StorableResponse;
+use rocket::{config::{Config, Environment}, http::Method, Route};
 
 mod storage;
 mod response;
@@ -30,17 +29,18 @@ enum SubCommand {
 }
 
 #[derive(Parser)]
-enum AddSubCommand {
-    FromURL(AddFromURL),
-    FromFile(AddFromFile),
+struct Add {
+    #[arg()]
+    local_endpoint: String,
+
+    #[command(subcommand)]
+    subcmd: AddSubCommand,
 }
 
 #[derive(Parser)]
-struct Add {
-    #[command(subcommand)]
-    subcmd: AddSubCommand,
-    #[arg()]
-    local_endpoint: String,
+enum AddSubCommand {
+    FromURL(AddFromURL),
+    FromFile(AddFromFile),
 }
 
 #[derive(Parser)]
@@ -93,10 +93,10 @@ async fn main() -> Result<()> {
         SubCommand::Add(add_args) => {
             match add_args.subcmd {
                 AddSubCommand::FromURL(url_args) => {
-                    add_from_url(bucket, add_args.local_endpoint, url_args.url).await;
+                    new_route_from_url(bucket, add_args.local_endpoint, url_args.url).await;
                 },
                 AddSubCommand::FromFile(path_args) => {
-                    add_from_file(bucket, add_args.local_endpoint, path_args.path).await;
+                    new_route_from_file(bucket, add_args.local_endpoint, path_args.path);
                 }
             }
         },
@@ -109,32 +109,6 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-async fn add_from_file(bucket: Bucket<'_, String, String>,local_endpoint: String, source_path: String) {
-    let encoded_url = storage::encode_url(&local_endpoint);
-    let content = match fs::read_to_string(source_path) {
-        Ok(content) => content,
-        Err(error) => panic!("Failed reading file: {:?}", error),
-    };
-
-    let _ = storage::set_value_for_key(&bucket, encoded_url, content);
-}
-
-async fn add_from_url(bucket: Bucket<'_, String, String>, local_endpoint: String, source_url: String) {
-    let url = match Url::parse(&source_url) {
-        Ok(url) => url,
-        Err(error) => panic!("Failed parsing URL: {:?}", error),
-    };
-
-    let response = response::get_json(url).await;
-    let response = match response {
-        Ok(response) => response,
-        Err(error) => panic!("Failed getting JSON from error: {:?}", error),
-    };
-
-    let encoded_url = storage::encode_url(&local_endpoint);
-    let _ = storage::set_value_for_key(&bucket, encoded_url, response.to_string());
 }
 
 fn serve(bucket: Bucket<String, String>, args: Serve) {
@@ -164,7 +138,7 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
             }
         };
     
-        let decoded_url = match storage::decode_url(&key) {
+        let decoded_url = match decode_url(&key) {
             Ok(url) => url,
             Err(error) => {
                 println!("Failed decoding key to URL: {:?}, error: {:?}", key, error);
@@ -178,5 +152,4 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
     }).collect();
 
     server.mount("/", routes).launch();
-
 }
