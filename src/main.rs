@@ -1,8 +1,8 @@
 use clap::Parser;
 use kv::Bucket;
+use response::decode_url;
+use storage::{new_route_from_file, new_route_from_url};
 use crate::response::StorableResponse;
-use crate::storage::add_from_url;
-use crate::storage::add_from_file;
 use rocket::{config::{Config, Environment}, http::Method, Route};
 
 mod storage;
@@ -93,10 +93,10 @@ async fn main() -> Result<()> {
         SubCommand::Add(add_args) => {
             match add_args.subcmd {
                 AddSubCommand::FromURL(url_args) => {
-                    add_from_url(bucket, add_args.local_endpoint, url_args.url).await;
+                    new_route_from_url(bucket, add_args.local_endpoint, url_args.url).await;
                 },
                 AddSubCommand::FromFile(path_args) => {
-                    add_from_file(bucket, add_args.local_endpoint, path_args.path);
+                    new_route_from_file(bucket, add_args.local_endpoint, path_args.path);
                 }
             }
         },
@@ -138,7 +138,7 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
             }
         };
     
-        let decoded_url = match response::decode_url(&key) {
+        let decoded_url = match decode_url(&key) {
             Ok(url) => url,
             Err(error) => {
                 println!("Failed decoding key to URL: {:?}, error: {:?}", key, error);
