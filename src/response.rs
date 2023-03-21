@@ -65,7 +65,6 @@ async fn to_deserialized_response(resp: reqwest::Response) -> Result<JsonValue, 
     let headers_map = headers_to_map(&headers);
     
     let storable_response = StorableResponse::from(json.to_string(), headers_map);
-
     let storable_response_json = serde_json::to_value(storable_response)?;
 
     Ok(storable_response_json)
