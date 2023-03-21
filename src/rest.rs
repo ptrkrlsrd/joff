@@ -1,6 +1,7 @@
 use reqwest::header::HeaderMap;
 use rocket::handler::{Handler, Outcome};
 use rocket::Response;
+use anyhow::Result;
 use rocket::{Data, Request};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -10,7 +11,6 @@ use url::Url;
 use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, CONTROLS};
 
 type Error = Box<dyn std::error::Error>;
-type Result<T, E = Error> = std::result::Result<T, E>;
 type JsonValue = serde_json::Value;
 
 const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
@@ -48,20 +48,19 @@ pub struct RestClient;
 impl RestClient {
     pub async fn get_json(url: Url) -> Result<JsonValue, Error> {
         let response = reqwest::get(url).await?;
-        let json = Self::to_deserialized_response(response).await?;
+        let headers = response.headers().clone();
+        let headers = Self::headers_to_map(&headers);
+
+        let json = Self::to_serialized_response(response, headers).await?;
 
         Ok(json)
     }
 
-    async fn to_deserialized_response(resp: reqwest::Response) -> Result<JsonValue, Error> {
-        let headers = resp.headers().clone();
-        let json = Self::read_json(resp).await?;
+    async fn to_serialized_response(resp: reqwest::Response, headers: HashMap<String, String>) -> Result<JsonValue, Error> {
+        let json_response = Self::read_json_from_response(resp).await?;
+        let storable_response = StorableResponse::from(json_response.to_string(), headers);
 
-        let headers_map = headers_to_map(&headers);
-
-        let storable_response = StorableResponse::from(json.to_string(), headers_map);
         let storable_response_json = serde_json::to_value(storable_response)?;
-
         Ok(storable_response_json)
     }
 
@@ -73,25 +72,24 @@ impl RestClient {
         .collect::<HashMap<_, _>>()
     }
 
-    async fn read_json(resp: reqwest::Response) -> Result<serde_json::Value, Error> {
+    async fn read_json_from_response(resp: reqwest::Response) -> Result<JsonValue, Error> {
         let json_data = resp.json::<serde_json::Value>().await?;
-        let json = serde_json::from_str::<serde_json::Value>(&json_data.to_string())?;
-        Ok(json)
+        Ok(json_data)
     }
 }
 
 pub fn encode_url(url: &String) -> String {
-    let encoded_url_iter = utf8_percent_encode(&url, FRAGMENT);
-    let encoded_url: String = encoded_url_iter.collect();
+    let encoded_url = utf8_percent_encode(&url, FRAGMENT);
+    let encoded_url: String = encoded_url.collect();
 
     return encoded_url;
 }
 
 pub fn decode_url(url: &str) -> Result<String, std::str::Utf8Error> {
-    let decoded_iter = percent_decode(url.as_bytes());
-    let decoded = decoded_iter.decode_utf8();
+    let decoded_url = percent_decode(url.as_bytes());
+    let decoded_url = decoded_url.decode_utf8();
 
-    return match decoded {
+    return match decoded_url {
         Ok(url) => Ok(url.to_string()),
         Err(error) => Err(error),
     };
