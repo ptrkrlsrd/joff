@@ -1,7 +1,9 @@
-use kv::*;
+use kv::{Config, Bucket, Store};
 use std::result::Result;
 
 use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, CONTROLS};
+
+const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
 
 type StorageError = kv::Error;
 
@@ -34,9 +36,6 @@ pub fn list_items(bucket: &Bucket<String, String>) {
         println!("URL: {}", &decoded);
     }
 }
-
-
-const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
 
 pub fn encode_url(url: &String) -> String {
     let encoded_url_iter = utf8_percent_encode(&url, FRAGMENT);

@@ -1,10 +1,9 @@
-use crate::response::StorableResponse;
-use std::fs;
 use clap::Parser;
-use reqwest::Url;
-use rocket::config::{Config, Environment};
-use rocket::{Route, http::Method};
 use kv::Bucket;
+use crate::{response::StorableResponse};
+use reqwest::Url;
+use rocket::{config::{Config, Environment}, http::Method, Route};
+use std::fs;
 
 mod storage;
 mod response;
@@ -30,17 +29,18 @@ enum SubCommand {
 }
 
 #[derive(Parser)]
-enum AddSubCommand {
-    FromURL(AddFromURL),
-    FromFile(AddFromFile),
+struct Add {
+    #[arg()]
+    local_endpoint: String,
+
+    #[command(subcommand)]
+    subcmd: AddSubCommand,
 }
 
 #[derive(Parser)]
-struct Add {
-    #[command(subcommand)]
-    subcmd: AddSubCommand,
-    #[arg()]
-    local_endpoint: String,
+enum AddSubCommand {
+    FromURL(AddFromURL),
+    FromFile(AddFromFile),
 }
 
 #[derive(Parser)]
@@ -137,6 +137,7 @@ async fn add_from_url(bucket: Bucket<'_, String, String>, local_endpoint: String
     let _ = storage::set_value_for_key(&bucket, encoded_url, response.to_string());
 }
 
+
 fn serve(bucket: Bucket<String, String>, args: Serve) {
     let rocket_cfg = Config::build(Environment::Staging)
         .address(args.addr)
@@ -178,5 +179,4 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
     }).collect();
 
     server.mount("/", routes).launch();
-
 }

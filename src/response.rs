@@ -18,8 +18,8 @@ pub struct StorableResponse {
 }
 
 impl StorableResponse {
-    fn from(body: String, headers: HashMap<String, String>) -> StorableResponse {
-        return StorableResponse { body, headers }
+    fn from(body: String, headers: HashMap<String, String>) -> Self {
+        return Self { body, headers }
     }
 }
 
