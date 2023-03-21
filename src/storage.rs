@@ -1,7 +1,7 @@
 use kv::{Config, Bucket, Store};
 use reqwest::Url;
 use std::{result::Result, fs};
-use crate::response::{encode_url, self};
+use crate::rest::{encode_url, self};
 
 type StorageError = kv::Error;
 type Error = Box<dyn std::error::Error>;
@@ -19,7 +19,7 @@ impl RouteManager {
     pub async fn new_route_from_url(bucket: Bucket<'_, String, String>, alias_endpoint: String, source_url: String) {
         let url = Url::parse(&source_url).expect("Failed parsing URL");
 
-        let response = response::RestClient::get_json(url).await.expect("Failed getting JSON from error");
+        let response = rest::RestClient::get_json(url).await.expect("Failed getting JSON from error");
 
         let encoded_url = encode_url(&alias_endpoint);
         Self::set_value_for_key(&bucket, encoded_url, response.to_string()).expect("Failed setting value for key");
@@ -41,7 +41,7 @@ impl RouteManager {
     pub fn list_items(bucket: &Bucket<String, String>) -> Result<(), Error> {
         for item in bucket.iter() {
             let key: String = item?.key()?;
-            let decoded = response::decode_url(&key)?;
+            let decoded = rest::decode_url(&key)?;
 
             println!("URL: {}", &decoded);
         }

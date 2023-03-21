@@ -1,13 +1,13 @@
 use clap::Parser;
 use kv::Bucket;
 use kv::Item;
-use crate::response::decode_url;
-use crate::response::StorableResponse;
+use crate::rest::decode_url;
+use crate::rest::StorableResponse;
 use storage::RouteManager;
 use rocket::{config::{Config, Environment}, http::Method, Route};
 
 mod storage;
-mod response;
+mod rest;
 
 #[derive(Parser)] // requires `derive` feature
 #[command(name = "joff")]
