@@ -22,8 +22,20 @@ pub struct StorableResponse {
 }
 
 impl StorableResponse {
-    fn from(body: String, headers: HashMap<String, String>) -> Self {
+    pub fn from(body: String, headers: HashMap<String, String>) -> Self {
         return Self { body, headers }
+    }
+
+
+    pub fn from_json(data: String) -> Result<StorableResponse, serde_json::Error> {
+        let json_response: StorableResponse = match serde_json::from_str(&data) {
+            Ok(json_data) => json_data,
+            Err(error) => {
+                return Err(error);
+            }
+        };
+
+        Ok(json_response)
     }
 }
 

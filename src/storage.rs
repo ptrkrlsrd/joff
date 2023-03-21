@@ -1,7 +1,8 @@
-use kv::{Config, Bucket, Store};
+use kv::{Config, Bucket, Store, Item};
 use reqwest::Url;
+use rocket::{Route, http::Method};
 use std::{result::Result, fs};
-use crate::rest::{encode_url, self};
+use crate::rest::{StorableResponse, self, encode_url, decode_url};
 
 type StorageError = kv::Error;
 type Error = Box<dyn std::error::Error>;
@@ -47,5 +48,36 @@ impl RouteManager {
         }
 
         Ok(())
+    }
+
+    pub fn get_routes_from_bucket(bucket: Bucket<String, String>) -> Vec<Route> {
+        bucket.iter().filter_map(|item| {
+            let item = item.unwrap();
+            let key = Self::get_key(&item)?;
+            let route = Self::new_route(&bucket, key).unwrap();
+
+            Some(route)
+        }).collect()
+    }
+
+    fn get_key(item: &Item<String, String>) -> Option<String> {
+        match item.key() {
+            Ok(key) => Some(key),
+            Err(error) => {
+                println!("Failed getting key: {:?}", error);
+                None
+            }
+        }
+    }
+
+    fn new_route(bucket: &Bucket<String, String>, url: String) -> Result<Route, Error> {
+        let bucket_data = bucket.get(&url)?.unwrap();
+
+        let json_response = StorableResponse::from_json(bucket_data)?;
+        let decoded_url = decode_url(&url)?;
+
+        let route = Route::new(Method::Get, &decoded_url, json_response);
+
+        Ok(route)
     }
 }

@@ -1,10 +1,7 @@
 use clap::Parser;
 use kv::Bucket;
-use kv::Item;
-use crate::rest::decode_url;
-use crate::rest::StorableResponse;
 use storage::RouteManager;
-use rocket::{config::{Config, Environment}, http::Method, Route};
+use rocket::config::{Config, Environment};
 
 mod storage;
 mod rest;
@@ -130,60 +127,7 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
         .unwrap();
 
     let server = rocket::custom(rocket_cfg);
-    let routes = get_routes_from_bucket(bucket);
+    let routes = RouteManager::get_routes_from_bucket(bucket);
 
     server.mount(args.base_endpoint.as_str(), routes).launch();
-}
-
-fn get_routes_from_bucket(bucket: Bucket<String, String>) -> Vec<Route> {
-    bucket.iter().filter_map(|item| {
-        let item = item.unwrap();
-        let key = get_key(&item)?;
-        let route = new_route(&bucket, key);
-        route
-    }).collect()
-}
-
-fn get_key(item: &Item<String, String>) -> Option<String> {
-    match item.key() {
-        Ok(key) => Some(key),
-        Err(error) => {
-            println!("Failed getting key: {:?}", error);
-            None
-        }
-    }
-}
-
-fn new_route(bucket: &Bucket<String, String>, key: String) -> Option<Route> {
-    let json_response = route_from_bucket(&bucket, &key)?;
-    let decoded_url = match decode_url(&key) {
-        Ok(url) => url,
-        Err(error) => {
-            println!("Failed decoding key to URL: {:?}, error: {:?}", key, error);
-            return None;
-        }
-    };
-    let route = Route::new(Method::Get, &decoded_url, json_response);
-
-    Some(route)
-}
-
-fn route_from_bucket(bucket: &Bucket<String, String>, key: &String) -> Option<StorableResponse> {
-    let bucket_data = match bucket.get(key) {
-        Ok(data) => data,
-        Err(error) => {
-            println!("Failed getting data for key: {:?}, error: {:?}", key, error);
-            return None;
-        }
-    }?;
-
-    let json_response: StorableResponse = match serde_json::from_str(&bucket_data) {
-        Ok(json_data) => json_data,
-        Err(error) => {
-            println!("Failed deserializing JSON for key: {:?}, error: {:?}", key, error);
-            return None;
-        }
-    };
-
-    Some(json_response)
 }
