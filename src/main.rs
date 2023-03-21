@@ -1,8 +1,8 @@
 use clap::Parser;
 use kv::Bucket;
-use response::decode_url;
-use storage::RouteManager;
+use crate::response::decode_url;
 use crate::response::StorableResponse;
+use storage::RouteManager;
 use rocket::{config::{Config, Environment}, http::Method, Route};
 
 mod storage;
@@ -65,6 +65,9 @@ struct Serve {
 
     #[arg(short, long, default_value = "30")]
     workers: u16,
+
+    #[arg(short, long, default_value = "/")]
+    base_endpoint: String,
 }
 
 #[derive(Parser)]
@@ -157,5 +160,5 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
         Some(route)
     }).collect();
 
-    server.mount("/", routes).launch();
+    server.mount(args.base_endpoint.as_str(), routes).launch();
 }

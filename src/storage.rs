@@ -1,7 +1,7 @@
 use kv::{Config, Bucket, Store};
 use reqwest::Url;
 use std::{result::Result, fs};
-use crate::response::{self, encode_url};
+use crate::response::{encode_url, self};
 
 type StorageError = kv::Error;
 type Error = Box<dyn std::error::Error>;
