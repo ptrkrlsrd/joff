@@ -57,10 +57,9 @@ impl RestClient {
         let headers = resp.headers().clone();
         let json = Self::read_json(resp).await?;
 
-        let headers_map = Self::headers_to_map(&headers);
+        let headers_map = headers_to_map(&headers);
 
         let storable_response = StorableResponse::from(json.to_string(), headers_map);
-
         let storable_response_json = serde_json::to_value(storable_response)?;
 
         Ok(storable_response_json)
