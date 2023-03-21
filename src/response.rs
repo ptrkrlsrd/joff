@@ -41,28 +41,8 @@ impl Handler for StorableResponse {
 
 pub async fn get_json(url: Url) -> Result<JsonValue, Error> {
     let response = reqwest::get(url).await?;
-    let json = to_deserialized_response(&response).await?;
+    let json = to_deserialized_response(response).await?;
 
-    Ok(json)
-}
-
-async fn to_deserialized_response(resp: &reqwest::Response) -> Result<JsonValue, Error> {
-    let json = read_json(resp.clone()).await?;
-    
-    // Convert the headers to a map and create a storable response
-    let headers_map = headers_to_map(&resp.headers().clone());
-    let mut storable_response = StorableResponse::from(json.to_string(), headers_map);
-
-    // Convert the storable response to a JSON value
-    let storable_response_json = serde_json::to_value(storable_response)?;
-
-    // Return the JSON value
-    Ok(storable_response_json)
-}
-
-async fn read_json(resp: &reqwest::Response) -> Result<serde_json::Value, Error> {
-    let json_data = resp.json::<serde_json::Value>().await?;
-    let json = serde_json::from_str::<serde_json::Value>(&json_data.to_string())?;
     Ok(json)
 }
 
@@ -71,4 +51,25 @@ fn headers_to_map(headers: &HeaderMap) -> HashMap<String, String> {
     .map(|(key, value)| (key.to_string(), value.to_str().map_or(String::new(), str::to_string)))
     .collect::<HashMap<_, _>>();
     headers
+}
+
+async fn to_deserialized_response(resp: reqwest::Response) -> Result<JsonValue, Error> {
+    let headers = resp.headers().clone();
+    let json = read_json(resp).await?;
+
+    let headers_map = headers_to_map(&headers);
+    
+    let storable_response = StorableResponse::from(json.to_string(), headers_map);
+
+    // Convert the storable response to a JSON value
+    let storable_response_json = serde_json::to_value(storable_response)?;
+
+    // Return the JSON value
+    Ok(storable_response_json)
+}
+
+async fn read_json(resp: reqwest::Response) -> Result<serde_json::Value, Error> {
+    let json_data = resp.json::<serde_json::Value>().await?;
+    let json = serde_json::from_str::<serde_json::Value>(&json_data.to_string())?;
+    Ok(json)
 }
