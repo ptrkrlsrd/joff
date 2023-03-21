@@ -15,7 +15,6 @@ type JsonValue = serde_json::Value;
 
 const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
 
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct StorableResponse {
     pub body: String,
@@ -44,37 +43,42 @@ impl Handler for StorableResponse {
     }
 }
 
-pub async fn get_json(url: Url) -> Result<JsonValue, Error> {
-    let response = reqwest::get(url).await?;
-    let json = to_deserialized_response(response).await?;
+pub struct RestClient;
 
-    Ok(json)
-}
+impl RestClient {
+    pub async fn get_json(url: Url) -> Result<JsonValue, Error> {
+        let response = reqwest::get(url).await?;
+        let json = Self::to_deserialized_response(response).await?;
 
-fn headers_to_map(headers: &HeaderMap) -> HashMap<String, String> {
-    let headers = headers.iter()
-    .map(|(key, value)| (key.to_string(), value.to_str().map_or(String::new(), str::to_string)))
-    .collect::<HashMap<_, _>>();
-    headers
-}
+        Ok(json)
+    }
 
-async fn to_deserialized_response(resp: reqwest::Response) -> Result<JsonValue, Error> {
-    let headers = resp.headers().clone();
-    let json = read_json(resp).await?;
+    async fn to_deserialized_response(resp: reqwest::Response) -> Result<JsonValue, Error> {
+        let headers = resp.headers().clone();
+        let json = Self::read_json(resp).await?;
 
-    let headers_map = headers_to_map(&headers);
-    
-    let storable_response = StorableResponse::from(json.to_string(), headers_map);
+        let headers_map = Self::headers_to_map(&headers);
 
-    let storable_response_json = serde_json::to_value(storable_response)?;
+        let storable_response = StorableResponse::from(json.to_string(), headers_map);
 
-    Ok(storable_response_json)
-}
+        let storable_response_json = serde_json::to_value(storable_response)?;
 
-async fn read_json(resp: reqwest::Response) -> Result<serde_json::Value, Error> {
-    let json_data = resp.json::<serde_json::Value>().await?;
-    let json = serde_json::from_str::<serde_json::Value>(&json_data.to_string())?;
-    Ok(json)
+        Ok(storable_response_json)
+    }
+
+    fn headers_to_map(headers: &HeaderMap) -> HashMap<String, String> {
+        headers.iter()
+            .filter_map(|(key, value)| {
+                value.to_str().ok().map(|value_str| (key.to_string(), value_str.to_string()))
+            })
+        .collect::<HashMap<_, _>>()
+    }
+
+    async fn read_json(resp: reqwest::Response) -> Result<serde_json::Value, Error> {
+        let json_data = resp.json::<serde_json::Value>().await?;
+        let json = serde_json::from_str::<serde_json::Value>(&json_data.to_string())?;
+        Ok(json)
+    }
 }
 
 pub fn encode_url(url: &String) -> String {
