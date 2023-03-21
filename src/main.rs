@@ -120,7 +120,13 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
 
     let server = rocket::custom(rocket_cfg);
     let routes: Vec<Route> = bucket.iter().filter_map(|item| {
-        let key: String = item.unwrap().key().unwrap();
+        let key: String = match item.unwrap().key() {
+            Ok(key) => key,
+            Err(error) => {
+                println!("Failed getting key: {:?}", error);
+                return None;
+            }
+        };
     
         let bucket_data = match bucket.get(&key) {
             Ok(data) => data,
