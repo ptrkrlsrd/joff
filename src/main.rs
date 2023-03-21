@@ -1,5 +1,6 @@
 use clap::Parser;
 use kv::Bucket;
+use kv::Item;
 use crate::response::decode_url;
 use crate::response::StorableResponse;
 use storage::RouteManager;
@@ -8,9 +9,11 @@ use rocket::{config::{Config, Environment}, http::Method, Route};
 mod storage;
 mod response;
 
-#[derive(Parser)]
+#[derive(Parser)] // requires `derive` feature
+#[command(name = "joff")]
 #[command(version = "1.0")]
-struct Opts {
+#[command(about = "jepp", long_about = None)]
+struct Cli {
     #[arg(short, long, default_value = "./data")]
     data_path: String,
 
@@ -23,16 +26,15 @@ struct Opts {
 
 #[derive(Parser)]
 enum SubCommand {
+    #[command(arg_required_else_help = true)]
     Add(Add),
     Serve(Serve),
     List(List),
 }
 
 #[derive(Parser)]
+#[command(args_conflicts_with_subcommands = true)]
 struct Add {
-    #[arg()]
-    local_endpoint: String,
-
     #[command(subcommand)]
     subcmd: AddSubCommand,
 }
@@ -45,14 +47,20 @@ enum AddSubCommand {
 
 #[derive(Parser)]
 struct AddFromURL {
-    #[arg(short, long)]
+    #[arg(required = true)]
     url: String,
+
+    #[arg(required = true)]
+    alias_url: String,
 }
 
 #[derive(Parser)]
 struct AddFromFile {
-    #[arg()]
-    path: String,
+    #[arg(required = true)]
+    file_path: String,
+
+    #[arg(required = true)]
+    alias_url: String,
 }
 
 #[derive(Parser)]
@@ -71,14 +79,14 @@ struct Serve {
 }
 
 #[derive(Parser)]
-struct List { }
+struct List;
 
 type Error = Box<dyn std::error::Error>;
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let opts: Opts = Opts::parse();
+    let opts: Cli = Cli::parse();
     let config_path: String = opts.data_path;
     let bucket_name: String = opts.bucket_name;
 
@@ -96,10 +104,10 @@ async fn main() -> Result<()> {
         SubCommand::Add(add_args) => {
             match add_args.subcmd {
                 AddSubCommand::FromURL(url_args) => {
-                    RouteManager::new_route_from_url(bucket, add_args.local_endpoint, url_args.url).await;
+                    RouteManager::new_route_from_url(bucket, url_args.alias_url, url_args.url).await;
                 },
                 AddSubCommand::FromFile(path_args) => {
-                    RouteManager::new_route_from_file(bucket, add_args.local_endpoint, path_args.path);
+                    RouteManager::new_route_from_file(bucket, path_args.alias_url, path_args.file_path);
                 }
             }
         },
@@ -107,7 +115,7 @@ async fn main() -> Result<()> {
             let _ = RouteManager::list_items(&bucket);
         },
         SubCommand::Serve(args) => {
-            serve(bucket, args);
+            let _ = serve(bucket, args);
         }
     }
 
@@ -122,43 +130,60 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
         .unwrap();
 
     let server = rocket::custom(rocket_cfg);
-    let routes: Vec<Route> = bucket.iter().filter_map(|item| {
-        let key: String = match item.unwrap().key() {
-            Ok(key) => key,
-            Err(error) => {
-                println!("Failed getting key: {:?}", error);
-                return None;
-            }
-        };
-    
-        let bucket_data = match bucket.get(&key) {
-            Ok(data) => data,
-            Err(error) => {
-                println!("Failed getting data for key: {:?}, error: {:?}", key, error);
-                return None;
-            }
-        };
-    
-        let json_response: StorableResponse = match serde_json::from_str(&bucket_data.unwrap()) {
-            Ok(json_data) => json_data,
-            Err(error) => {
-                println!("Failed deserializing JSON for key: {:?}, error: {:?}", key, error);
-                return None;
-            }
-        };
-    
-        let decoded_url = match decode_url(&key) {
-            Ok(url) => url,
-            Err(error) => {
-                println!("Failed decoding key to URL: {:?}, error: {:?}", key, error);
-                return None;
-            }
-        };
-    
-        let route = Route::new(Method::Get, &decoded_url, json_response);
-    
-        Some(route)
-    }).collect();
+    let routes = get_routes_from_bucket(bucket);
 
     server.mount(args.base_endpoint.as_str(), routes).launch();
+}
+
+fn get_routes_from_bucket(bucket: Bucket<String, String>) -> Vec<Route> {
+    bucket.iter().filter_map(|item| {
+        let item = item.unwrap();
+        let key = get_key(&item)?;
+        let route = new_route(&bucket, key);
+        route
+    }).collect()
+}
+
+fn get_key(item: &Item<String, String>) -> Option<String> {
+    match item.key() {
+        Ok(key) => Some(key),
+        Err(error) => {
+            println!("Failed getting key: {:?}", error);
+            None
+        }
+    }
+}
+
+fn new_route(bucket: &Bucket<String, String>, key: String) -> Option<Route> {
+    let json_response = route_from_bucket(&bucket, &key)?;
+    let decoded_url = match decode_url(&key) {
+        Ok(url) => url,
+        Err(error) => {
+            println!("Failed decoding key to URL: {:?}, error: {:?}", key, error);
+            return None;
+        }
+    };
+    let route = Route::new(Method::Get, &decoded_url, json_response);
+
+    Some(route)
+}
+
+fn route_from_bucket(bucket: &Bucket<String, String>, key: &String) -> Option<StorableResponse> {
+    let bucket_data = match bucket.get(key) {
+        Ok(data) => data,
+        Err(error) => {
+            println!("Failed getting data for key: {:?}, error: {:?}", key, error);
+            return None;
+        }
+    }?;
+
+    let json_response: StorableResponse = match serde_json::from_str(&bucket_data) {
+        Ok(json_data) => json_data,
+        Err(error) => {
+            println!("Failed deserializing JSON for key: {:?}, error: {:?}", key, error);
+            return None;
+        }
+    };
+
+    Some(json_response)
 }
