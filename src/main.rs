@@ -1,9 +1,9 @@
 use clap::Parser;
 use kv::Bucket;
-use crate::{response::StorableResponse};
-use reqwest::Url;
+use crate::response::StorableResponse;
+use crate::storage::add_from_url;
+use crate::storage::add_from_file;
 use rocket::{config::{Config, Environment}, http::Method, Route};
-use std::fs;
 
 mod storage;
 mod response;
@@ -96,7 +96,7 @@ async fn main() -> Result<()> {
                     add_from_url(bucket, add_args.local_endpoint, url_args.url).await;
                 },
                 AddSubCommand::FromFile(path_args) => {
-                    add_from_file(bucket, add_args.local_endpoint, path_args.path).await;
+                    add_from_file(bucket, add_args.local_endpoint, path_args.path);
                 }
             }
         },
@@ -110,33 +110,6 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-
-async fn add_from_file(bucket: Bucket<'_, String, String>,local_endpoint: String, source_path: String) {
-    let encoded_url = storage::encode_url(&local_endpoint);
-    let content = match fs::read_to_string(source_path) {
-        Ok(content) => content,
-        Err(error) => panic!("Failed reading file: {:?}", error),
-    };
-
-    let _ = storage::set_value_for_key(&bucket, encoded_url, content);
-}
-
-async fn add_from_url(bucket: Bucket<'_, String, String>, local_endpoint: String, source_url: String) {
-    let url = match Url::parse(&source_url) {
-        Ok(url) => url,
-        Err(error) => panic!("Failed parsing URL: {:?}", error),
-    };
-
-    let response = response::get_json(url).await;
-    let response = match response {
-        Ok(response) => response,
-        Err(error) => panic!("Failed getting JSON from error: {:?}", error),
-    };
-
-    let encoded_url = storage::encode_url(&local_endpoint);
-    let _ = storage::set_value_for_key(&bucket, encoded_url, response.to_string());
-}
-
 
 fn serve(bucket: Bucket<String, String>, args: Serve) {
     let rocket_cfg = Config::build(Environment::Staging)
@@ -165,7 +138,7 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
             }
         };
     
-        let decoded_url = match storage::decode_url(&key) {
+        let decoded_url = match response::decode_url(&key) {
             Ok(url) => url,
             Err(error) => {
                 println!("Failed decoding key to URL: {:?}, error: {:?}", key, error);
