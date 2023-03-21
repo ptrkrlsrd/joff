@@ -1,8 +1,8 @@
 use clap::Parser;
 use kv::Bucket;
-use response::decode_url;
-use storage::{new_route_from_file, new_route_from_url};
+use crate::response::decode_url;
 use crate::response::StorableResponse;
+use storage::RouteManager;
 use rocket::{config::{Config, Environment}, http::Method, Route};
 
 mod storage;
@@ -65,6 +65,9 @@ struct Serve {
 
     #[arg(short, long, default_value = "30")]
     workers: u16,
+
+    #[arg(short, long, default_value = "/")]
+    base_endpoint: String,
 }
 
 #[derive(Parser)]
@@ -79,12 +82,12 @@ async fn main() -> Result<()> {
     let config_path: String = opts.data_path;
     let bucket_name: String = opts.bucket_name;
 
-    let store = match storage::new_store(config_path) {
+    let store = match RouteManager::new_store(config_path) {
         Ok(store) => store,
         Err(error) => panic!("Failed creating store: {:?}", error),
     };
 
-    let bucket = match storage::new_bucket(&store, &bucket_name) {
+    let bucket = match RouteManager::new_bucket(&store, &bucket_name) {
         Ok(bucket) => bucket,
         Err(error) => panic!("Failed creating bucket: {:?}", error),
     };
@@ -93,15 +96,15 @@ async fn main() -> Result<()> {
         SubCommand::Add(add_args) => {
             match add_args.subcmd {
                 AddSubCommand::FromURL(url_args) => {
-                    new_route_from_url(bucket, add_args.local_endpoint, url_args.url).await;
+                    RouteManager::new_route_from_url(bucket, add_args.local_endpoint, url_args.url).await;
                 },
                 AddSubCommand::FromFile(path_args) => {
-                    new_route_from_file(bucket, add_args.local_endpoint, path_args.path);
+                    RouteManager::new_route_from_file(bucket, add_args.local_endpoint, path_args.path);
                 }
             }
         },
         SubCommand::List(_) => {
-            storage::list_items(&bucket);
+            let _ = RouteManager::list_items(&bucket);
         },
         SubCommand::Serve(args) => {
             serve(bucket, args);
@@ -120,7 +123,13 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
 
     let server = rocket::custom(rocket_cfg);
     let routes: Vec<Route> = bucket.iter().filter_map(|item| {
-        let key: String = item.unwrap().key().unwrap();
+        let key: String = match item.unwrap().key() {
+            Ok(key) => key,
+            Err(error) => {
+                println!("Failed getting key: {:?}", error);
+                return None;
+            }
+        };
     
         let bucket_data = match bucket.get(&key) {
             Ok(data) => data,
@@ -151,5 +160,5 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
         Some(route)
     }).collect();
 
-    server.mount("/", routes).launch();
+    server.mount(args.base_endpoint.as_str(), routes).launch();
 }
