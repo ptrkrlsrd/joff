@@ -1,5 +1,4 @@
 use clap::Parser;
-use kv::Bucket;
 use storage::RouteManager;
 use rocket::config::{Config, Environment};
 
@@ -27,6 +26,7 @@ enum SubCommand {
     Add(Add),
     Serve(Serve),
     List(List),
+    Clean(Clean),
 }
 
 #[derive(Parser)]
@@ -78,6 +78,9 @@ struct Serve {
 #[derive(Parser)]
 struct List;
 
+#[derive(Parser)]
+struct Clean;
+
 type Error = Box<dyn std::error::Error>;
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -86,40 +89,38 @@ async fn main() -> Result<()> {
     let opts: Cli = Cli::parse();
     let config_path: String = opts.data_path;
     let bucket_name: String = opts.bucket_name;
+    let route_manager = RouteManager::new(config_path, bucket_name)?;
 
-    let store = match RouteManager::new_store(config_path) {
-        Ok(store) => store,
-        Err(error) => panic!("Failed creating store: {:?}", error),
-    };
-
-    let bucket = match RouteManager::new_bucket(&store, &bucket_name) {
-        Ok(bucket) => bucket,
-        Err(error) => panic!("Failed creating bucket: {:?}", error),
-    };
 
     match opts.subcmd {
         SubCommand::Add(add_args) => {
             match add_args.subcmd {
                 AddSubCommand::FromURL(url_args) => {
-                    RouteManager::new_route_from_url(bucket, url_args.alias_url, url_args.url).await;
+                    route_manager.new_route_from_url(url_args.alias_url, url_args.url).await;
                 },
                 AddSubCommand::FromFile(path_args) => {
-                    RouteManager::new_route_from_file(bucket, path_args.alias_url, path_args.file_path);
+                    route_manager.new_route_from_file(path_args.alias_url, path_args.file_path);
                 }
             }
         },
         SubCommand::List(_) => {
-            let _ = RouteManager::list_items(&bucket);
+            route_manager.list_items().unwrap();
         },
         SubCommand::Serve(args) => {
-            let _ = serve(bucket, args);
+            serve(route_manager, args);
+        },
+        SubCommand::Clean(_) => {
+            match route_manager.clean_storage() {
+                Ok(_) => (),
+                Err(err) => panic!("{}", err),
+            };
         }
     }
 
     Ok(())
 }
 
-fn serve(bucket: Bucket<String, String>, args: Serve) {
+fn serve(route_manager: RouteManager, args: Serve) {
     let rocket_cfg = Config::build(Environment::Staging)
         .address(args.addr)
         .port(args.port)
@@ -127,7 +128,7 @@ fn serve(bucket: Bucket<String, String>, args: Serve) {
         .unwrap();
 
     let server = rocket::custom(rocket_cfg);
-    let routes = RouteManager::get_routes_from_bucket(bucket);
+    let routes = route_manager.get_routes_from_bucket();
 
     server.mount(args.base_endpoint.as_str(), routes).launch();
 }
