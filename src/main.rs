@@ -5,7 +5,7 @@ use rocket::config::{Config, Environment};
 mod storage;
 mod rest;
 
-#[derive(Parser)] // requires `derive` feature
+#[derive(Parser)]
 #[command(name = "joff")]
 #[command(version = "1.0")]
 #[command(about = "jepp", long_about = None)]
@@ -87,9 +87,9 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 #[tokio::main]
 async fn main() -> Result<()> {
     let opts: Cli = Cli::parse();
-    let config_path: String = opts.data_path;
+    let data_path: String = opts.data_path;
     let bucket_name: String = opts.bucket_name;
-    let route_manager = RouteManager::new(config_path, bucket_name)?;
+    let route_manager = RouteManager::new(data_path, bucket_name)?;
 
 
     match opts.subcmd {
