@@ -93,28 +93,23 @@ async fn main() -> Result<()> {
 
 
     match opts.subcmd {
-        SubCommand::Add(add_args) => {
-            match add_args.subcmd {
-                AddSubCommand::FromURL(url_args) => {
-                    route_manager.new_route_from_url(url_args.alias_url, url_args.url).await;
-                },
-                AddSubCommand::FromFile(path_args) => {
-                    route_manager.new_route_from_file(path_args.alias_url, path_args.file_path);
-                }
-            }
+        SubCommand::Add(add_args) => match add_args.subcmd {
+            AddSubCommand::FromURL(url_args) => {
+                route_manager.new_route_from_url(url_args.alias_url, url_args.url).await;
+            },
+            AddSubCommand::FromFile(path_args) => {
+                route_manager.new_route_from_file(path_args.alias_url, path_args.file_path);
+            },
         },
         SubCommand::List(_) => {
-            route_manager.list_items().unwrap();
+            route_manager.list_items()?;
         },
         SubCommand::Serve(args) => {
             serve(route_manager, args);
         },
         SubCommand::Clean(_) => {
-            match route_manager.clean_storage() {
-                Ok(_) => (),
-                Err(err) => panic!("{}", err),
-            };
-        }
+            route_manager.clean_storage()?;
+        },
     }
 
     Ok(())
@@ -130,5 +125,5 @@ fn serve(route_manager: RouteManager, args: Serve) {
     let server = rocket::custom(rocket_cfg);
     let routes = route_manager.get_routes_from_bucket();
 
-    server.mount(args.base_endpoint.as_str(), routes).launch();
+    server.mount(&args.base_endpoint, routes).launch();
 }

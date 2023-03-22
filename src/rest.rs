@@ -15,6 +15,8 @@ type JsonValue = serde_json::Value;
 
 const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
 
+const DISALLOWED_HEADERS: &[&str] = &["transfer-encoding"];
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct StorableResponse {
     pub body: String,
@@ -39,13 +41,13 @@ impl StorableResponse {
     }
 }
 
+
 impl Handler for StorableResponse {
     fn handle<'r>(&self, req: &'r Request, _data: Data) -> Outcome<'r> {
         let mut response = Response::new();
-        let disallowed_headers = vec!["transfer-encoding"];
 
         for (key, value) in self.headers.iter() {
-            if !disallowed_headers.contains(&key.as_str()) {
+            if !DISALLOWED_HEADERS.contains(&key.as_str()) {
                 response.set_raw_header(key.clone(), value.clone());
             }
         }

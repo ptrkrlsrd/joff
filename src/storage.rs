@@ -44,14 +44,6 @@ impl RouteManager<'_> {
         self.bucket.flush()
     }
 
-    pub fn new_bucket<'a>(store: &Store, bucket_name: &str) -> Result<kv::Bucket<'a, String, String>, StorageError> {
-        store.bucket::<String, String>(Some(&bucket_name))
-    }
-
-    pub fn set_value_for_key(bucket: &Bucket<String, String>, key: String, value: String) -> Result<(), StorageError> {
-        bucket.set(key, value)
-    }
-
     pub fn list_items(self) -> Result<(), Error> {
         for item in self.bucket.iter() {
             let key: String = item?.key()?;
@@ -71,6 +63,14 @@ impl RouteManager<'_> {
 
             Some(route)
         }).collect()
+    }
+
+    fn new_bucket<'a>(store: &Store, bucket_name: &str) -> Result<kv::Bucket<'a, String, String>, StorageError> {
+        store.bucket::<String, String>(Some(&bucket_name))
+    }
+
+    fn set_value_for_key(bucket: &Bucket<String, String>, key: String, value: String) -> Result<(), StorageError> {
+        bucket.set(key, value)
     }
 
     fn get_key(item: &Item<String, String>) -> Option<String> {
