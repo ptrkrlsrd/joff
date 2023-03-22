@@ -108,3 +108,6 @@ pub fn decode_url(url: &str) -> Result<String, std::str::Utf8Error> {
         Err(error) => Err(error),
     };
 }
+
+#[cfg(test)]
+mod tests;
