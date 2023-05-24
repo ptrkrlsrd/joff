@@ -28,7 +28,6 @@ impl StorableResponse {
         return Self { body, headers }
     }
 
-
     pub fn from_json(data: String) -> Result<StorableResponse, serde_json::Error> {
         let json_response: StorableResponse = match serde_json::from_str(&data) {
             Ok(json_data) => json_data,
